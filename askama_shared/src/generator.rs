@@ -1102,6 +1102,7 @@ impl<'a, S: std::hash::BuildHasher> Generator<'a, S> {
             Expr::NumLit(s) => self.visit_num_lit(buf, s),
             Expr::StrLit(s) => self.visit_str_lit(buf, s),
             Expr::CharLit(s) => self.visit_char_lit(buf, s),
+            Expr::Const(s) => self.visit_const(buf, s),
             Expr::Var(s) => self.visit_var(buf, s),
             Expr::VarCall(var, ref args) => self.visit_var_call(buf, var, args)?,
             Expr::Path(ref path) => self.visit_path(buf, path),
@@ -1461,6 +1462,11 @@ impl<'a, S: std::hash::BuildHasher> Generator<'a, S> {
         Ok(DisplayWrap::Unwrapped)
     }
 
+    fn visit_const(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
+        buf.write(s);
+        DisplayWrap::Unwrapped
+    }
+
     fn visit_var(&mut self, buf: &mut Buffer, s: &str) -> DisplayWrap {
         if s == "self" {
             buf.write(s);
@@ -1723,11 +1729,8 @@ impl MapChain<'_, &str, LocalMeta> {
     }
 
     fn resolve_or_self(&self, name: &str) -> String {
-        match self.resolve(name) {
-            Some(name) => name,
-            None if name.chars().any(char::is_uppercase) => name.to_string(),
-            None => format!("self.{}", name),
-        }
+        self.resolve(name)
+            .unwrap_or_else(|| format!("self.{}", name))
     }
 }
 

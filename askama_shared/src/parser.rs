@@ -35,6 +35,7 @@ pub enum Expr<'a> {
     NumLit(&'a str),
     StrLit(&'a str),
     CharLit(&'a str),
+    Const(&'a str),
     Var(&'a str),
     VarCall(&'a str, Vec<Expr<'a>>),
     Path(Vec<&'a str>),
@@ -345,7 +346,13 @@ fn param_char_lit(i: &[u8]) -> IResult<&[u8], MatchParameter> {
 }
 
 fn expr_var(i: &[u8]) -> IResult<&[u8], Expr> {
-    map(identifier, |s| Expr::Var(s))(i)
+    map(identifier, |s| {
+        if s.chars().any(char::is_uppercase) {
+            Expr::Const(s)
+        } else {
+            Expr::Var(s)
+        }
+    })(i)
 }
 
 fn expr_var_call(i: &[u8]) -> IResult<&[u8], Expr> {
@@ -1235,17 +1242,32 @@ mod tests {
             vec![Node::Expr(Ws(false, false), Expr::Var("foo"))],
         );
         assert_eq!(
-            super::parse("{{ FOO }}", &s).unwrap(),
-            vec![Node::Expr(Ws(false, false), Expr::Var("FOO"))],
+            super::parse("{{ foo_bar }}", &s).unwrap(),
+            vec![Node::Expr(Ws(false, false), Expr::Var("foo_bar"))],
         );
 
         assert_eq!(
             super::parse("{{ none }}", &s).unwrap(),
             vec![Node::Expr(Ws(false, false), Expr::Var("none"))],
         );
+    }
+
+    #[test]
+    fn test_parse_const() {
+        let s = Syntax::default();
+
+        assert_eq!(
+            super::parse("{{ FOO }}", &s).unwrap(),
+            vec![Node::Expr(Ws(false, false), Expr::Const("FOO"))],
+        );
+        assert_eq!(
+            super::parse("{{ FOO_BAR }}", &s).unwrap(),
+            vec![Node::Expr(Ws(false, false), Expr::Const("FOO_BAR"))],
+        );
+
         assert_eq!(
             super::parse("{{ NONE }}", &s).unwrap(),
-            vec![Node::Expr(Ws(false, false), Expr::Var("NONE"))],
+            vec![Node::Expr(Ws(false, false), Expr::Const("NONE"))],
         );
     }
 
@@ -1264,6 +1286,7 @@ mod tests {
                 Expr::PathCall(vec!["Some"], vec![Expr::NumLit("123")],),
             )],
         );
+
         assert_eq!(
             super::parse("{{ Ok(123) }}", &s).unwrap(),
             vec![Node::Expr(
